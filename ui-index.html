@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>UNC Employee Points</title>
+  <style>
+    body { font-family: system-index, sans-serif; margin: 24px; }
+    .card { border: 1px solid #e5e7eb; border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+    .grid { display: grid; gap: 12px; }
+    label { display:block; font-size: 14px; margin-bottom: 4px; }
+    input, select, textarea { width: 100%; padding: 10px; border:1px solid #e5e7eb; border-radius: 8px; }
+    button { padding: 10px 14px; border-radius: 8px; border: 0; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h1>UNC Employee Points (MVP)</h1>
+
+  <div class="card">
+    <h3>Register / Update Profile</h3>
+    <div class="grid">
+      <input id="emp" placeholder="EmployeeID (เช่น U001)" />
+      <input id="name" placeholder="Display Name" />
+      <input id="nick" placeholder="Nickname" />
+      <input id="dept" placeholder="Department" />
+      <input id="email" placeholder="Email" />
+      <input id="line" placeholder="LINE UserId (จาก LIFF หรือ Bot)" />
+      <button onclick="register()">Save</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Send Feedback / Kudos</h3>
+    <div class="grid">
+      <input id="toEmp" placeholder="Target EmployeeID" />
+      <input id="actId" placeholder="ActivityID (optional)" />
+      <select id="category">
+        <option value="Heart">Heart</option>
+        <option value="Like">Like</option>
+        <option value="Star">Star</option>
+      </select>
+      <input id="stars" type="number" placeholder="Score (default 1)" />
+      <textarea id="msg" placeholder="ข้อความชื่นชม"></textarea>
+      <button onclick="sendFeedback()">Send</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Event Register</h3>
+    <div class="grid">
+      <input id="evId" placeholder="EventID" />
+      <input id="evEmp" placeholder="EmployeeID" />
+      <button onclick="regEvent()">Register</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Event Check-in (Admin)</h3>
+    <div class="grid">
+      <input id="regId" placeholder="RegID" />
+      <input id="checkedBy" placeholder="CheckedBy (AdminID)" />
+      <input id="pointsAttend" placeholder="PointsOnAttend (e.g. 5)" />
+      <button onclick="checkin()">Check-in</button>
+    </div>
+  </div>
+
+  <div id="out"></div>
+
+<script>
+const BASE = "https://script.google.com/macros/s/AKfycbx3jVbrAXfw0qdzv0o2cYGcoeiehzu3V5rqrWuHTodDqiJa01xGiIO9yjYYnPtYiZ7K9A/exec"; // <-- replace after deploy
+
+<!-- การเข้าร่วมกิจกรรม & เช็คอินเก็บแต้ม -->
+<div class="card">
+  <h3>🎯 เข้าร่วมกิจกรรม & เช็คอินเก็บแต้ม</h3>
+  <p style="font-size:14px;color:#6b7280">
+    ใส่รหัสพนักงาน และรหัสกิจกรรม (ActivityID) ที่ HR หรือผู้จัดกิจกรรมแจ้งไว้
+    จากนั้นกด “เช็คอินรับแต้ม”
+  </p>
+  <div class="grid">
+    <label>
+      รหัสพนักงาน (EmployeeID)
+      <input id="empCheckin" placeholder="เช่น U001" />
+    </label>
+
+    <label>
+      รหัสกิจกรรม (ActivityID)
+      <input id="activityCheckin" placeholder="เช่น A2025-001" />
+    </label>
+
+    <button onclick="checkinActivity()">
+      ✅ เช็คอินรับแต้ม
+    </button>
+
+    <div id="checkinResult" style="font-size:14px;color:#059669"></div>
+  </div>
+</div>
+
+<!-- ส่งกำลังใจ/ฟีดแบ็กให้เพื่อน (ได้แต้มทั้งผู้ส่งและผู้รับ) -->
+<div class="card">
+  <h3>💚 ส่งกำลังใจให้เพื่อน & เก็บแต้ม</h3>
+  <p style="font-size:14px;color:#6b7280">
+    ระบบจะให้แต้มกับทั้งผู้ส่ง และผู้รับ ตามประเภทที่เลือกไว้
+  </p>
+  <div class="grid">
+    <label>
+      รหัสพนักงานของคุณ (ผู้ส่ง)
+      <input id="empFeedback" placeholder="เช่น U001" />
+    </label>
+
+    <label>
+      รหัสพนักงานเพื่อน (ผู้รับ)
+      <input id="empTarget" placeholder="เช่น U002" />
+    </label>
+
+    <label>
+      รหัสกิจกรรม (ActivityID) (ไม่บังคับ)
+      <input id="activityFeedback" placeholder="เช่น A2025-001 (ถ้ามี)" />
+    </label>
+
+    <label>
+      ประเภทกำลังใจ
+      <select id="fbCategory">
+        <option value="Heart">❤️ Heart</option>
+        <option value="Like">👍 Like</option>
+        <option value="Star">⭐ Star</option>
+      </select>
+    </label>
+
+    <label>
+      จำนวนดาว / แต้มพิเศษ (ค่าเริ่มต้น = 1)
+      <input id="fbStars" type="number" min="1" placeholder="1" />
+    </label>
+
+    <label>
+      ข้อความถึงเพื่อน
+      <textarea id="fbMessage" placeholder="วันนี้ประทับใจอะไรในตัวเพื่อนคนนี้..."></textarea>
+    </label>
+
+    <button onclick="sendKudos()">
+      💌 ส่งกำลังใจ & เก็บแต้ม
+    </button>
+
+    <div id="fbResult" style="font-size:14px;color:#059669"></div>
+  </div>
+</div>
+
+<!-- ดูคะแนนสะสมของตัวเอง -->
+<div class="card">
+  <h3>🏆 คะแนนสะสมของฉัน</h3>
+  <div class="grid">
+    <label>
+      รหัสพนักงาน (EmployeeID)
+      <input id="empBalance" placeholder="เช่น U001" />
+    </label>
+    <button onclick="getMyPoints()">
+      🔎 ดูคะแนนสะสม
+    </button>
+    <div id="balanceResult" style="font-size:14px;color:#111827"></div>
+  </div>
+</div>
+
+<script>
+// ⚠️ ถ้ายังไม่มี ให้กำหนดไว้ด้านบนสุดของไฟล์
+// const BASE = "https://script.google.com/macros/s/....../exec";
+
+// ฟังก์ชันยิง POST ไปหา backend Apps Script
+async function apiPost(path, payload) {
+  const res = await fetch(BASE + "?path=" + encodeURIComponent(path), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload || {})
+  });
+  return res.json();
+}
+
+// ✅ เช็คอินกิจกรรมเพื่อรับแต้ม
+async function checkinActivity() {
+  const emp = document.getElementById("empCheckin").value.trim();
+  const act = document.getElementById("activityCheckin").value.trim();
+  const out = document.getElementById("checkinResult");
+  out.textContent = "";
+
+  if (!emp || !act) {
+    out.style.color = "#b91c1c";
+    out.textContent = "กรุณากรอกรหัสพนักงาน และรหัสกิจกรรมให้ครบถ้วน";
+    return;
+  }
+
+  try {
+    const data = await apiPost("checkin", {
+      EmployeeID: emp,
+      ActivityID: act
+    });
+    if (data.ok) {
+      out.style.color = "#059669";
+      out.textContent = `เช็คอินสำเร็จ 🎉 คุณได้รับ ${data.points || 0} คะแนนจากกิจกรรมนี้`;
+    } else {
+      out.style.color = "#b91c1c";
+      out.textContent = "เช็คอินไม่สำเร็จ: " + (data.error || "กรุณาลองใหม่อีกครั้ง");
+    }
+  } catch (e) {
+    out.style.color = "#b91c1c";
+    out.textContent = "เกิดข้อผิดพลาดในการเชื่อมต่อระบบ";
+  }
+}
+
+// 💚 ส่งกำลังใจ / ฟีดแบ็กให้เพื่อน
+async function sendKudos() {
+  const emp = document.getElementById("empFeedback").value.trim();
+  const target = document.getElementById("empTarget").value.trim();
+  const act = document.getElementById("activityFeedback").value.trim();
+  const cat = document.getElementById("fbCategory").value;
+  const stars = Number(document.getElementById("fbStars").value || 1);
+  const msg = document.getElementById("fbMessage").value.trim();
+  const out = document.getElementById("fbResult");
+  out.textContent = "";
+
+  if (!emp || !target) {
+    out.style.color = "#b91c1c";
+    out.textContent = "กรุณากรอกรหัสพนักงานของคุณ และรหัสพนักงานเพื่อนให้ครบ";
+    return;
+  }
+
+  if (!msg) {
+    out.style.color = "#b91c1c";
+    out.textContent = "กรุณาเขียนข้อความถึงเพื่อนเล็กน้อย เพื่อให้กำลังใจกัน ❤️";
+    return;
+  }
+
+  try {
+    const data = await apiPost("feedback", {
+      EmployeeID: emp,
+      TargetEmployeeID: target,
+      ActivityID: act || "",
+      Category: cat,
+      Message: msg,
+      Stars: stars
+    });
+    if (data.ok) {
+      out.style.color = "#059669";
+      out.textContent = "ส่งกำลังใจให้เพื่อนสำเร็จแล้ว 🎉 ระบบได้บันทึกคะแนนให้ทั้งสองฝ่าย";
+      // ล้างข้อความ
+      document.getElementById("fbMessage").value = "";
+    } else {
+      out.style.color = "#b91c1c";
+      out.textContent = "ส่งไม่สำเร็จ: " + (data.error || "กรุณาลองใหม่อีกครั้ง");
+    }
+  } catch (e) {
+    out.style.color = "#b91c1c";
+    out.textContent = "เกิดข้อผิดพลาดในการเชื่อมต่อระบบ";
+  }
+}
+
+// 🏆 ดึงคะแนนสะสมของพนักงาน
+async function getMyPoints() {
+  const emp = document.getElementById("empBalance").value.trim();
+  const out = document.getElementById("balanceResult");
+  out.textContent = "";
+
+  if (!emp) {
+    out.style.color = "#b91c1c";
+    out.textContent = "กรุณากรอกรหัสพนักงานก่อน";
+    return;
+  }
+
+  try {
+    const data = await apiPost("points/balance", { EmployeeID: emp });
+    if (data.ok) {
+      out.style.color = "#111827";
+      out.textContent = `ตอนนี้คุณมีคะแนนสะสมทั้งหมด: ${data.balance || 0} คะแนน 🎯`;
+    } else {
+      out.style.color = "#b91c1c";
+      out.textContent = "ไม่สามารถดึงคะแนนได้: " + (data.error || "กรุณาลองใหม่อีกครั้ง");
+    }
+  } catch (e) {
+    out.style.color = "#b91c1c";
+    out.textContent = "เกิดข้อผิดพลาดในการเชื่อมต่อระบบ";
+  }
+}
+</script>
+</body>
+</html>
